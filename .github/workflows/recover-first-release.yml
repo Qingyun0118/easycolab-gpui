@@ -1,0 +1,49 @@
+name: Recover first tested release
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/recover-first-release.yml']
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  recover:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: v0.1.0-main.2.1.0369ccd
+      RELEASE_SHA: 0369ccd537fe426ad27c8c3cb2fceb6eb55e635b
+    steps:
+      - name: Download previously tested artifacts
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          github-token: ${{ github.token }}
+          run-id: 45546179670
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+      - name: Verify and publish first release
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          windows="easycolab-gpui-${RELEASE_TAG}-x86_64-pc-windows-msvc.zip"
+          linux="easycolab-gpui-${RELEASE_TAG}-x86_64-unknown-linux-gnu.tar.gz"
+          for archive in "$windows" "$linux"; do
+            test -f "$archive"
+            test -f "$archive.sha256"
+            sed -i 's/\r$//' "$archive.sha256"
+            sha256sum --strict --check "$archive.sha256"
+          done
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release already exists; refusing to overwrite it."
+            exit 0
+          fi
+          gh release create "$RELEASE_TAG" "$windows" "$windows.sha256" "$linux" "$linux.sha256" --target "$RELEASE_SHA" --title "EasyColab GPUI $RELEASE_TAG" --notes "First automated desktop release, recovered from the successful Windows and Linux build jobs of workflow run #2. Includes SHA-256 checksums. Extract the complete archive and follow the included README. Windows: Python 3.12 (64-bit), then run.ps1. Linux: run.sh." --draft
+          gh release edit "$RELEASE_TAG" --draft=false --latest
