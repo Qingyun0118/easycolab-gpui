@@ -78,7 +78,7 @@ def package(binary: Path, target: str, version: str, output: Path, commit: str):
     with archive.open("rb") as handle:
         digest = hashlib.file_digest(handle, "sha256").hexdigest()
     checksum = archive.with_name(archive.name + ".sha256")
-    checksum.write_text(f"{digest}  {archive.name}\n", encoding="utf-8")
+    checksum.write_text(f"{digest}  {archive.name}\n", encoding="utf-8", newline="\n")
     print(archive)
     print(checksum)
     return archive
