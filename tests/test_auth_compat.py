@@ -352,7 +352,7 @@ class AuthCompatTest(unittest.TestCase):
             out_lines = [ln for ln in buf.getvalue().splitlines() if ln.strip()]
             progress_lines = [ln for ln in out_lines if ln.startswith("WAKE_PROGRESS:")]
             self.assertGreaterEqual(len(progress_lines), 4)
-            self.assertTrue(any("正在打包 (1/1) src/train.py" in ln for ln in progress_lines))
+            self.assertTrue(any("正在打包 (1/1) src/train.py" in ln.replace("\\", "/") for ln in progress_lines))
             self.assertTrue(any(ln.startswith("WAKE_PROGRESS:1.000|") for ln in progress_lines))
             payload = json.loads(out_lines[-1])
             self.assertTrue(payload["ok"])

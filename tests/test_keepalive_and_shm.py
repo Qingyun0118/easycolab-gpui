@@ -199,7 +199,7 @@ class ColabBridgeKeepaliveTest(unittest.TestCase):
             self.assertIn("X-Colab-Runtime-Proxy-Token: proxy_tok_123", kwargs["header"])
 
     def test_keepalive_daemon_exits_promptly_when_parent_stdin_closes(self):
-        import select
+        import queue
         import tempfile
 
         code = (
@@ -232,9 +232,13 @@ class ColabBridgeKeepaliveTest(unittest.TestCase):
                 if stream and not stream.closed:
                     stream.close()
         self.addCleanup(cleanup_child)
-        ready, _, _ = select.select([proc.stdout], [], [], 5)
-        self.assertTrue(ready, "Keepalive test daemon did not produce a startup event")
-        first_line = proc.stdout.readline().strip()
+        # Windows select() accepts sockets, but not subprocess pipes.
+        startup = queue.Queue()
+        threading.Thread(target=lambda: startup.put(proc.stdout.readline()), daemon=True).start()
+        try:
+            first_line = startup.get(timeout=5).strip()
+        except queue.Empty:
+            self.fail("Keepalive test daemon did not produce a startup event")
         self.assertTrue(first_line.startswith("KEEPALIVE_JSON:"), msg=first_line)
         # Close parent stdin pipe -> daemon must exit immediately without hanging for 6s+
         t0 = time.time()
@@ -516,7 +520,7 @@ class MiniMaxH3ImageEngineTest(unittest.TestCase):
                     "minimax_h3_image", "text_encoder/model-00001-of-00014.safetensors"
                 )
                 self.assertIsNotNone(shared_hit)
-                self.assertIn("MiniMax-H3/FL2VA/text_encoder", shared_hit)
+                self.assertIn("MiniMax-H3/FL2VA/text_encoder", shared_hit.replace("\\", "/"))
 
                 out_dir = ns["prepare_minimax_h3_image_assembled_dir"](
                     target_id="minimax_h3_image",
