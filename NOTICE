@@ -1,0 +1,15 @@
+EasyColab GPUI
+
+The Python files in python/ are snapshots of the local EasyColab working tree
+at the time of migration (2026-11-23), including its OAuth/keyring compatibility
+changes. They retain the original implementation and are distributed under
+the Apache License 2.0. See licenses/EasyColab-Apache-2.0.txt.
+Source: https://github.com/wy51ai/easycolab
+
+The desktop shell design and portions of its GPUI/Ely setup are adapted from
+Colab Playground, Copyright (c) 2026 ScarletKc, under the MIT License.
+See licenses/Playground-MIT.txt.
+Source: https://github.com/scarletkc/colab-playground
+
+GPUI and Ely GPUI Components remain separate dependencies governed by their
+respective licenses. The new Rust client is distributed under Apache-2.0.

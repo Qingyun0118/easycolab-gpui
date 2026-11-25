@@ -1,0 +1,14 @@
+/target/
+/.tooling/
+/.venv/
+__pycache__/
+*.pyc
+/dist/
+.env
+.env.*
+!.env.example
+settings.json
+token.json
+credentials.json
+*.pem
+*.key

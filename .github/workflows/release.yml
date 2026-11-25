@@ -1,0 +1,131 @@
+name: Build, test and release
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTUP_TOOLCHAIN: 1.98.0
+  PYTHONUTF8: '1'
+  CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS: '-C target-feature=+crt-static'
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            executable: easycolab-gpui
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+            executable: easycolab-gpui.exe
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: '3.12'
+      - name: Install Linux native libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake pkg-config libasound2-dev libfontconfig1-dev libssl-dev libwayland-dev libx11-xcb-dev libxkbcommon-x11-dev libxcb1-dev libxcb-randr0-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-xkb-dev libvulkan-dev
+      - name: Install Rust toolchain
+        run: rustup toolchain install 1.98.0 --profile minimal --component rustfmt --component clippy --target '${{ matrix.target }}'
+      - name: Prepare Python bridge (Linux)
+        if: runner.os == 'Linux'
+        run: ./scripts/setup-python.sh
+      - name: Prepare Python bridge (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/setup-python.ps1
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Check Rust code
+        run: cargo clippy --all-targets --locked --target '${{ matrix.target }}' -- -D warnings
+      - name: Test Rust code
+        run: cargo test --locked --target '${{ matrix.target }}'
+      - name: Test Python bridge (Linux)
+        if: runner.os == 'Linux'
+        run: PYTHONPATH=python .venv/bin/python -m unittest discover -s tests -p 'test_*.py'
+      - name: Test Python bridge (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = 'python'
+          & ./.venv/Scripts/python.exe -m unittest discover -s tests -p 'test_*.py'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build release
+        run: cargo build --release --locked --target '${{ matrix.target }}'
+      - name: Package and smoke test release
+        env:
+          TARGET: ${{ matrix.target }}
+          EXECUTABLE: ${{ matrix.executable }}
+        run: |
+          version="v$(python -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')-main.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}.${GITHUB_SHA:0:7}"
+          python scripts/package.py --binary "target/$TARGET/release/$EXECUTABLE" --target "$TARGET" --version "$version"
+      - name: Upload packages
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: release-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish GitHub release
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+      - name: Verify packages and publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          cd dist
+          test "$(find . -maxdepth 1 -name '*.sha256' | wc -l)" -eq 2
+          sha256sum --check ./*.sha256
+          cd ..
+          version="v$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)-main.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}.${GITHUB_SHA:0:7}"
+          cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
+          Automated build from main. Includes Windows x64 ZIP and Linux x64 tar.gz, with SHA-256 checksums.
+
+          Extract the complete archive before starting. Windows: install Python 3.12 (64-bit), then run `powershell -ExecutionPolicy Bypass -File .\run.ps1 --mock` for a demo, or omit `--mock` for real service use. The launcher prepares the local Python environment on first real use. Linux: run `./run.sh --mock` or `./run.sh`.
+
+          See the included README for prerequisites, configuration and cloud GPU billing behavior.
+          NOTES
+          gh release create "$version" dist/* --target "$GITHUB_SHA" --title "EasyColab GPUI $version" --notes-file "$RUNNER_TEMP/release-notes.md" --draft
+          # An older build may finish after a newer commit. Keep its release,
+          # while only the current main commit can become the latest release.
+          latest=false
+          if [[ "$(gh api "repos/$GH_REPO/commits/main" --jq .sha)" == "$GITHUB_SHA" ]]; then latest=true; fi
+          gh release edit "$version" --draft=false --latest="$latest"

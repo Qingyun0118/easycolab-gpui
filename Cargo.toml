@@ -1,0 +1,44 @@
+[package]
+name = "easycolab-gpui"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98"
+description = "A GPUI and Ely desktop client for EasyColab ComfyUI"
+license = "Apache-2.0"
+
+[dependencies]
+anyhow = "1"
+base64 = "0.22"
+dirs = "6"
+ely-gpui-component = { git = "https://github.com/ELY-Open-Source/Ely-GPUI-Components", rev = "c01a140e95deef8437c85aafd3617acfd798d58e" }
+gpui = { package = "gpui-pre", version = "=0.3.12" }
+futures = "0.3"
+getrandom = "0.3"
+log = "0.4"
+env_logger = "0.11"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ureq = "3"
+url = "2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.12", features = ["wayland", "x11"] }
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.12" }
+
+[dev-dependencies]
+png = "0.18"
+tempfile = "3"
+gpui = { package = "gpui-pre", version = "=0.3.12", features = ["test-support"] }
+ely-gpui-component = { git = "https://github.com/ELY-Open-Source/Ely-GPUI-Components", rev = "c01a140e95deef8437c85aafd3617acfd798d58e", features = ["test-support"] }
+
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
+[profile.release]
+lto = "thin"
+strip = true

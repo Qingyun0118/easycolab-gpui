@@ -1,0 +1,12 @@
+{
+  "snapshot_date": "2026-11-23",
+  "easycolab_commit": "fcad66f0d766194ad65ce1843bd624a43010721a",
+  "playground_commit": "778c5f94caba6602023a876316ee5684f073472c",
+  "easycolab_worktree_note": "colab_bridge.py includes pre-existing uncommitted OAuth/keyring compatibility changes; snapshots copied from working tree, not HEAD",
+  "files": {
+    "python/app.py": "e8665fd66003f3e695d3059d0e336b8b85aeb53914723764d2f0fa92bce6d9a5",
+    "python/colab_bridge.py": "0325f38ac82949b15e0524935cf2b5c3bb7b803b43aacedff47d922183fd516a",
+    "python/requirements.txt": "b6d41b8951e8cca3680c7b1b1aa7a724dab4f317183e843974590ab2e7981d62",
+    "python/runtime_auth.py": "7497ec72d8fad9dbbb7ed5744d5514f7f9f92435e13a0474743879ba8eea297c"
+  }
+}

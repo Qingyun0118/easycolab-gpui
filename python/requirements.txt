@@ -1,0 +1,10 @@
+# Local desktop bridge dependencies (Python 3.12 or later).
+# Cloud GPU inference dependencies are installed separately on Colab.
+# Pin the bridge API and the direct versions validated before release.
+
+google-colab-cli==0.8.0
+google-auth==2.63.1
+google-auth-oauthlib==1.5.0
+requests==2.34.2
+requests-oauthlib==2.0.0
+websocket-client==1.9.2
